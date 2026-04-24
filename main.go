@@ -350,7 +350,7 @@ func SMode(epochs int, iterate func(iterations int) ([]complex128, Matrix[comple
 		stddev /= complex(float64(len(G)), 0)
 		stddev = cmplx.Sqrt(stddev)
 		fmt.Println("G", avg, stddev)
-		gavg = append(gavg, plotter.XY{X: float64(epoch), Y: float64(cmplx.Abs(avg))})
+		gavg = append(gavg, plotter.XY{X: real(avg), Y: imag(avg)})
 		for _, G := range G {
 			gs = append(gs, plotter.XY{X: float64(epoch), Y: float64(cmplx.Abs(G))})
 			gshist = append(gshist, float64(cmplx.Abs(G)))
