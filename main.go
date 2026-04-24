@@ -71,6 +71,7 @@ func Hadamard(k tc128.Continuation, node int, a, b *tc128.V, options ...map[stri
 type G struct {
 	Iteration int
 	Rng       *rand.Rand
+	G         Matrix[complex128]
 	Others    *tc128.Set
 	Set       *tc128.Set
 }
@@ -78,6 +79,13 @@ type G struct {
 // NewG creates a new g model
 func NewG(rows, cols int) G {
 	rng := rand.New(rand.NewSource(1))
+
+	g := NewMatrix[complex128](Width-1, 33)
+	for range g.Rows {
+		for range g.Cols {
+			g.Data = append(g.Data, complex(rng.Float64(), rng.Float64()))
+		}
+	}
 
 	others := tc128.NewSet()
 	others.Add("x", cols, rows)
@@ -114,13 +122,30 @@ func NewG(rows, cols int) G {
 	//set.ByName["l"].X[0] = U
 	return G{
 		Rng:    rng,
+		G:      g,
 		Others: &others,
 		Set:    &set,
 	}
 }
 
 // Iterate iterates the g model
-func (g *G) Iterate(inputs Matrix[complex128], iterations int) ([]complex128, [][]complex128) {
+func (g *G) Iterate(iterations int) ([]complex128, Matrix[complex128]) {
+	inputs := NewMatrix[complex128](g.G.Rows, g.G.Rows)
+	for i := range g.G.Rows {
+		for j := range g.G.Rows {
+			sum := 0.0
+			for k := range g.G.Cols {
+				diff := cmplx.Abs(g.G.Data[i*g.G.Cols+k] - g.G.Data[j*g.G.Cols+k])
+				sum += diff * diff
+			}
+			distance := math.Sqrt(sum)
+			if distance == 0 {
+				inputs.Data = append(inputs.Data, 0)
+				continue
+			}
+			inputs.Data = append(inputs.Data, complex(1/distance, 0))
+		}
+	}
 	x, index := g.Others.ByName["x"], 0
 	for row := range inputs.Rows {
 		for _, value := range inputs.Data[row*inputs.Cols : row*inputs.Cols+inputs.Cols] {
@@ -156,7 +181,7 @@ func (g *G) Iterate(inputs Matrix[complex128], iterations int) ([]complex128, []
 	l = tc128.Gradient(loss).X[0]
 	if cmplx.IsNaN(l) || cmplx.IsInf(l) {
 		fmt.Println(iteration, l)
-		return nil, nil
+		return nil, Matrix[complex128]{}
 	}
 
 	norm := 0.0
@@ -243,92 +268,39 @@ func (g *G) Iterate(inputs Matrix[complex128], iterations int) ([]complex128, []
 	sort.Slice(cp, func(i, j int) bool {
 		return cp[i].Cluster < cp[j].Cluster
 	})*/
+
 	I := g.Set.ByName["i"]
-	outputs := make([][]complex128, inputs.Rows)
-	for i := range outputs {
-		outputs[i] = I.X[i*Width : (i+1)*Width]
+	for i := range I.S[1] {
+		v := I.X[i*I.S[0]+3]
+		for ii := range I.S[0] - 1 {
+			g.G.Data[i*g.G.Cols+ii] += v * I.X[i*I.S[0]+ii]
+		}
 	}
-	return g.Set.ByName["g"].X, outputs
+
+	return g.Set.ByName["g"].X, g.G
 }
 
 // SMode s mode
-func SMode(epochs int, iterate func(inputs Matrix[complex128], iterations int) ([]complex128, [][]complex128)) {
-	rng := rand.New(rand.NewSource(1))
-	g := NewMatrix[complex128](Width-1, 33)
-	for range g.Rows {
-		for range g.Cols {
-			g.Data = append(g.Data, complex(rng.Float64(), rng.Float64()))
-		}
-	}
-	getadj := func() Matrix[complex128] {
-		gadj := NewMatrix[complex128](g.Rows, g.Rows)
-		for i := range g.Rows {
-			for j := range g.Rows {
-				sum := 0.0
-				for k := range g.Cols {
-					diff := cmplx.Abs(g.Data[i*g.Cols+k] - g.Data[j*g.Cols+k])
-					sum += diff * diff
-				}
-				distance := math.Sqrt(sum)
-				if distance == 0 {
-					gadj.Data = append(gadj.Data, 0)
-					continue
-				}
-				gadj.Data = append(gadj.Data, complex(1/distance, 0))
-			}
-		}
-		return gadj
-	}
-	gadj := getadj()
-	fmt.Println(gadj.Data)
+func SMode(epochs int, iterate func(iterations int) ([]complex128, Matrix[complex128])) {
 	images := &gif.GIF{}
 	var palette = []color.Color{}
 	for i := range 256 {
 		g := byte(i)
 		palette = append(palette, color.RGBA{g, g, g, 0xff})
 	}
-	delay := make([][]chan float64, g.Rows)
+	/*delay := make([][]chan float64, g.Rows)
 	for i := range delay {
 		delay[i] = make([]chan float64, g.Cols)
 		for ii := range delay[i] {
 			delay[i][ii] = make(chan float64, 2)
 		}
-	}
+	}*/
 	gs := make(plotter.XYs, 0, 8)
 	gavg := make(plotter.XYs, 0, 8)
 	var gshist plotter.Values
 	for epoch := range epochs {
 		fmt.Println(epoch)
-		G, outputs := iterate(gadj, 512)
-		for i := range outputs {
-			type R struct {
-				R float64
-				I int
-			}
-			r := make([]R, g.Rows)
-			for ii := range r {
-				r[ii].R = cmplx.Abs(gadj.Data[i*gadj.Rows+ii])
-				r[ii].I = ii
-			}
-			sort.Slice(r, func(i, j int) bool {
-				return r[i].R < r[j].R
-			})
-			//split := r[len(r)/2]
-			for ii := range outputs[i][:3] {
-				v := outputs[i][ii]
-				/*if v > split.R {
-					select {
-					case vv := <-delay[i][ii]:
-						delay[i][ii] <- v
-						g.Data[i*g.Cols+ii] += vv
-					default:
-						delay[i][ii] <- v
-					}
-				} else {*/
-				g.Data[i*g.Cols+ii] += v * outputs[i][3]
-				//}
-			}
-		}
+		G, g := iterate(512)
 		if epoch < 1024 {
 			image := image.NewPaletted(image.Rect(0, 0, 1024, 1024), palette)
 			type Offset struct {
@@ -365,7 +337,6 @@ func SMode(epochs int, iterate func(inputs Matrix[complex128], iterations int) (
 			images.Image = append(images.Image, image)
 			images.Delay = append(images.Delay, 10)
 		}
-		gadj = getadj()
 		avg := complex128(0.0)
 		for _, value := range G {
 			avg += value
@@ -400,8 +371,6 @@ func SMode(epochs int, iterate func(inputs Matrix[complex128], iterations int) (
 	}
 
 	{
-		fmt.Println(g.Data)
-
 		p := plot.New()
 
 		p.Title.Text = "G vs time"
