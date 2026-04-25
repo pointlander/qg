@@ -256,6 +256,15 @@ func Simulate(epochs int, iterate func(iterations int) (*tc128.V, Matrix[complex
 					y := 500*(yy-minY)/(maxY-minY) + 6
 					image.Set(offset.X+int(x), offset.Y+int(y), color.RGBA{0xff, 0xff, 0xff, 0xff})
 				}
+				for i := range 1024 {
+					image.Set(512, i, color.RGBA{0xff, 0xff, 0xff, 0xff})
+					image.Set(i, 512, color.RGBA{0xff, 0xff, 0xff, 0xff})
+				}
+				for i := range 512 {
+					for ii := range 4 {
+						image.Set(int(float64(epoch*i)/float64(epochs))+512, 1023-ii, color.RGBA{0xff, 0xff, 0xff, 0xff})
+					}
+				}
 			}
 			images.Image = append(images.Image, image)
 			images.Delay = append(images.Delay, 10)
