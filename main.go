@@ -45,7 +45,7 @@ const (
 
 const (
 	// Width is the embedding width
-	Width = 4
+	Width = 3
 )
 
 var palette = []color.Color{}
@@ -70,7 +70,7 @@ type QG struct {
 func NewQG(rows, cols int) QG {
 	rng := rand.New(rand.NewSource(1))
 
-	x := NewMatrix[complex128](Width-1, 33)
+	x := NewMatrix[complex128](Width, rows)
 	for range x.Rows {
 		for range x.Cols {
 			x.Data = append(x.Data, complex(rng.Float64(), rng.Float64()))
@@ -203,10 +203,13 @@ func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
 
 	v := q.Set.ByName["v"]
 	for i := range v.S[1] {
-		dt := v.X[i*v.S[0]+3]
+		/*dt := v.X[i*v.S[0]+3]
 		for ii := range v.S[0] - 1 {
 			q.X.Data[i*q.X.Cols+ii] += dt * v.X[i*v.S[0]+ii]
-		}
+		}*/
+		q.X.Data[i*q.X.Cols+0] += v.X[i*v.S[0]+0] * v.X[i*v.S[0]+1]
+		q.X.Data[i*q.X.Cols+1] += v.X[i*v.S[0]+0] * v.X[i*v.S[0]+2]
+		q.X.Data[i*q.X.Cols+2] += v.X[i*v.S[0]+1] * v.X[i*v.S[0]+2]
 	}
 
 	return q.Set.ByName["g"], q.X
