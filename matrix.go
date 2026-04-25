@@ -222,10 +222,10 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 				}
 			}
 			s := max * S
-			output := NewMatrix[T](m.Cols, m.Rows)
-			out := make([]T, 0, len(data))
-			switch out := any(out).(type) {
+			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
+			switch out := any(output.Data).(type) {
 			case []float32:
+				index := 0
 				for i := 0; i < len(data); i += m.Cols {
 					sum := float32(0.0)
 					values := make([]float32, m.Cols)
@@ -234,11 +234,11 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 						sum += values[j]
 					}
 					for _, value := range values {
-						out = append(out, value/sum)
+						out[index] = value / sum
+						index++
 					}
 				}
 			}
-			output.Data = out
 			return output
 		}
 	case float64:
@@ -252,10 +252,10 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 				}
 			}
 			s := max * S
-			output := NewMatrix[T](m.Cols, m.Rows)
-			out := make([]T, 0, len(data))
-			switch out := any(out).(type) {
+			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
+			switch out := any(output.Data).(type) {
 			case []float64:
+				index := 0
 				for i := 0; i < len(data); i += m.Cols {
 					sum := float64(0.0)
 					values := make([]float64, m.Cols)
@@ -264,11 +264,11 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 						sum += values[j]
 					}
 					for _, value := range values {
-						out = append(out, value/sum)
+						out[index] = value / sum
+						index++
 					}
 				}
 			}
-			output.Data = out
 			return output
 		}
 	case complex64:
@@ -282,10 +282,10 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 				}
 			}
 			s := complex(float32(max*S), 0)
-			output := NewMatrix[T](m.Cols, m.Rows)
-			out := make([]T, 0, len(data))
-			switch out := any(out).(type) {
+			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
+			switch out := any(output.Data).(type) {
 			case []complex64:
+				index := 0
 				for i := 0; i < len(data); i += m.Cols {
 					sum := complex(float32(0.0), 0)
 					values := make([]complex64, m.Cols)
@@ -294,11 +294,11 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 						sum += values[j]
 					}
 					for _, value := range values {
-						out = append(out, value/sum)
+						out[index] = value / sum
+						index++
 					}
 				}
 			}
-			output.Data = out
 			return output
 		}
 	case complex128:
@@ -312,10 +312,10 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 				}
 			}
 			s := complex(float64(max*S), 0)
-			output := NewMatrix[T](m.Cols, m.Rows)
-			out := make([]T, 0, len(data))
-			switch out := any(out).(type) {
+			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
+			switch out := any(output.Data).(type) {
 			case []complex128:
+				index := 0
 				for i := 0; i < len(data); i += m.Cols {
 					sum := complex(float64(0.0), 0)
 					values := make([]complex128, m.Cols)
@@ -324,11 +324,11 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 						sum += values[j]
 					}
 					for _, value := range values {
-						out = append(out, value/sum)
+						out[index] = value / sum
+						index++
 					}
 				}
 			}
-			output.Data = out
 			return output
 		}
 	}
@@ -336,19 +336,46 @@ func (m Matrix[T]) Softmax(t T) Matrix[T] {
 }
 
 // Sigmoid computes the sigmoid of a matrix
-/*func (m Matrix[T]) Sigmoid() Matrix[T] {
+func (m Matrix[T]) Sigmoid() Matrix[T] {
 	o := Matrix[T]{
 		Size: Size{
 			Cols: m.Cols,
 			Rows: m.Rows,
 		},
-		Data: make([]T, 0, m.Cols*m.Rows),
+		Data: make([]T, m.Cols*m.Rows),
 	}
-	for _, value := range m.Data {
-		o.Data = append(o.Data, 1/(1+T(math.Exp(float64(-value)))))
+	switch data := any(m.Data).(type) {
+	case []float32:
+		switch out := any(o.Data).(type) {
+		case []float32:
+			for i, value := range data {
+				out[i] = float32(1 / (1 + math.Exp(float64(-value))))
+			}
+		}
+	case []float64:
+		switch out := any(o.Data).(type) {
+		case []float64:
+			for i, value := range data {
+				out[i] = 1 / (1 + math.Exp(float64(-value)))
+			}
+		}
+	case []complex64:
+		switch out := any(o.Data).(type) {
+		case []complex64:
+			for i, value := range data {
+				out[i] = complex64(1 / (1 + cmplx.Exp(complex128(-value))))
+			}
+		}
+	case []complex128:
+		switch out := any(o.Data).(type) {
+		case []complex128:
+			for i, value := range data {
+				out[i] = 1 / (1 + cmplx.Exp(-value))
+			}
+		}
 	}
 	return o
-}*/
+}
 
 // ReLu is the ramp function
 /*func (m Matrix[T]) ReLu() Matrix[T] {
