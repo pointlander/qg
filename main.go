@@ -118,7 +118,7 @@ func NewQG(rows, cols int) QG {
 
 // Iterate iterates the g model
 func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
-	inputs := NewMatrix[complex128](q.X.Rows, q.X.Rows)
+	x, index := q.Others.ByName["x"], 0
 	for i := range q.X.Rows {
 		for j := range q.X.Rows {
 			sum := 0.0
@@ -128,16 +128,11 @@ func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
 			}
 			distance := math.Sqrt(sum)
 			if distance == 0 {
-				inputs.Data = append(inputs.Data, 0)
+				x.X[index] = 0
+				index++
 				continue
 			}
-			inputs.Data = append(inputs.Data, complex(1/distance, 0))
-		}
-	}
-	x, index := q.Others.ByName["x"], 0
-	for row := range inputs.Rows {
-		for _, value := range inputs.Data[row*inputs.Cols : row*inputs.Cols+inputs.Cols] {
-			x.X[index] = value
+			x.X[index] = complex(1/distance, 0)
 			index++
 		}
 	}
