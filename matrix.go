@@ -210,129 +210,22 @@ func (m Matrix[T]) Hadamard(n Matrix[T]) Matrix[T] {
 
 // Softmax calculates the softmax of the matrix rows
 func (m Matrix[T]) Softmax(t T) Matrix[T] {
-	switch t := any(t).(type) {
-	case float32:
-		switch data := any(m.Data).(type) {
-		case []float32:
-			max := float32(0.0)
-			for _, v := range data {
-				v /= t
-				if v > max {
-					max = v
-				}
-			}
-			s := max * S
-			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
-			switch out := any(output.Data).(type) {
-			case []float32:
-				index := 0
-				for i := 0; i < len(data); i += m.Cols {
-					sum := float32(0.0)
-					values := make([]float32, m.Cols)
-					for j, value := range data[i : i+m.Cols] {
-						values[j] = float32(math.Exp(float64(value/t - s)))
-						sum += values[j]
-					}
-					for _, value := range values {
-						out[index] = value / sum
-						index++
-					}
-				}
-			}
-			return output
+	s := max(m.Data) * S
+	output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(m.Data))...)
+	index := 0
+	for i := 0; i < len(m.Data); i += m.Cols {
+		sum := T(0.0)
+		values := make([]T, m.Cols)
+		for j, value := range m.Data[i : i+m.Cols] {
+			values[j] = exp(value/t - s)
+			sum += values[j]
 		}
-	case float64:
-		switch data := any(m.Data).(type) {
-		case []float64:
-			max := float64(0.0)
-			for _, v := range data {
-				v /= t
-				if v > max {
-					max = v
-				}
-			}
-			s := max * S
-			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
-			switch out := any(output.Data).(type) {
-			case []float64:
-				index := 0
-				for i := 0; i < len(data); i += m.Cols {
-					sum := float64(0.0)
-					values := make([]float64, m.Cols)
-					for j, value := range data[i : i+m.Cols] {
-						values[j] = float64(math.Exp(float64(value/t - s)))
-						sum += values[j]
-					}
-					for _, value := range values {
-						out[index] = value / sum
-						index++
-					}
-				}
-			}
-			return output
-		}
-	case complex64:
-		switch data := any(m.Data).(type) {
-		case []complex64:
-			max := float32(0.0)
-			for _, v := range data {
-				v /= t
-				if v := float32(cmplx.Abs(complex128(v))); v > max {
-					max = v
-				}
-			}
-			s := complex(float32(max*S), 0)
-			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
-			switch out := any(output.Data).(type) {
-			case []complex64:
-				index := 0
-				for i := 0; i < len(data); i += m.Cols {
-					sum := complex(float32(0.0), 0)
-					values := make([]complex64, m.Cols)
-					for j, value := range data[i : i+m.Cols] {
-						values[j] = complex64(cmplx.Exp(complex128(value/t - s)))
-						sum += values[j]
-					}
-					for _, value := range values {
-						out[index] = value / sum
-						index++
-					}
-				}
-			}
-			return output
-		}
-	case complex128:
-		switch data := any(m.Data).(type) {
-		case []complex128:
-			max := float32(0.0)
-			for _, v := range data {
-				v /= t
-				if v := float32(cmplx.Abs(v)); v > max {
-					max = v
-				}
-			}
-			s := complex(float64(max*S), 0)
-			output := NewMatrix[T](m.Cols, m.Rows, make([]T, len(data))...)
-			switch out := any(output.Data).(type) {
-			case []complex128:
-				index := 0
-				for i := 0; i < len(data); i += m.Cols {
-					sum := complex(float64(0.0), 0)
-					values := make([]complex128, m.Cols)
-					for j, value := range data[i : i+m.Cols] {
-						values[j] = cmplx.Exp(value/t - s)
-						sum += values[j]
-					}
-					for _, value := range values {
-						out[index] = value / sum
-						index++
-					}
-				}
-			}
-			return output
+		for _, value := range values {
+			output.Data[index] = value / sum
+			index++
 		}
 	}
-	return Matrix[T]{}
+	return output
 }
 
 // Sigmoid computes the sigmoid of a matrix
@@ -344,35 +237,8 @@ func (m Matrix[T]) Sigmoid() Matrix[T] {
 		},
 		Data: make([]T, m.Cols*m.Rows),
 	}
-	switch data := any(m.Data).(type) {
-	case []float32:
-		switch out := any(o.Data).(type) {
-		case []float32:
-			for i, value := range data {
-				out[i] = float32(1 / (1 + math.Exp(float64(-value))))
-			}
-		}
-	case []float64:
-		switch out := any(o.Data).(type) {
-		case []float64:
-			for i, value := range data {
-				out[i] = 1 / (1 + math.Exp(float64(-value)))
-			}
-		}
-	case []complex64:
-		switch out := any(o.Data).(type) {
-		case []complex64:
-			for i, value := range data {
-				out[i] = complex64(1 / (1 + cmplx.Exp(complex128(-value))))
-			}
-		}
-	case []complex128:
-		switch out := any(o.Data).(type) {
-		case []complex128:
-			for i, value := range data {
-				out[i] = 1 / (1 + cmplx.Exp(-value))
-			}
-		}
+	for i, value := range m.Data {
+		o.Data[i] = 1 / (1 + exp(-value))
 	}
 	return o
 }
@@ -573,6 +439,60 @@ func sqrt[T Float](x T) T {
 		return any(cmplx.Sqrt(v)).(T)
 	default:
 		return x
+	}
+}
+
+func exp[T Float](x T) T {
+	switch v := any(x).(type) {
+	case float32:
+		return any(float32(math.Exp(float64(v)))).(T)
+	case float64:
+		return any(math.Exp(v)).(T)
+	case complex64:
+		return any(complex64(cmplx.Exp(complex128(v)))).(T)
+	case complex128:
+		return any(cmplx.Exp(v)).(T)
+	default:
+		return x
+	}
+}
+
+func max[T Float](x []T) T {
+	switch v := any(x).(type) {
+	case []float32:
+		max := float32(0.0)
+		for _, v := range v {
+			if v > max {
+				max = v
+			}
+		}
+		return any(max).(T)
+	case []float64:
+		max := float64(0.0)
+		for _, v := range v {
+			if v > max {
+				max = v
+			}
+		}
+		return any(max).(T)
+	case []complex64:
+		max := complex64(0)
+		for _, v := range v {
+			if cmplx.Abs(complex128(v)) > cmplx.Abs(complex128(max)) {
+				max = v
+			}
+		}
+		return any(max).(T)
+	case []complex128:
+		max := complex128(0)
+		for _, v := range v {
+			if cmplx.Abs(v) > cmplx.Abs(max) {
+				max = v
+			}
+		}
+		return any(max).(T)
+	default:
+		return 0
 	}
 }
 
