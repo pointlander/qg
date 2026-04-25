@@ -149,51 +149,53 @@ func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
 		tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout)), l0))
 
 	var l complex128
-	iteration := q.Iteration
-	pow := func(x float64) float64 {
-		y := math.Pow(x, float64(iteration+1))
-		if math.IsNaN(y) || math.IsInf(y, 0) {
-			return 0
-		}
-		return y
-	}
-
-	q.Set.Zero()
-	q.Others.Zero()
-	l = tc128.Gradient(loss).X[0]
-	if cmplx.IsNaN(l) || cmplx.IsInf(l) {
-		fmt.Println(iteration, l)
-		return nil, Matrix[complex128]{}
-	}
-
-	norm := 0.0
-	for _, p := range q.Set.Weights {
-		for _, d := range p.D {
-			norm += cmplx.Abs(d) * cmplx.Abs(d)
-		}
-	}
-	norm = math.Sqrt(norm)
-	b1, b2 := pow(B1), pow(B2)
-	scaling := 1.0
-	if norm > 1 {
-		scaling = 1 / norm
-	}
-	for _, w := range q.Set.Weights {
-		for ii, d := range w.D {
-			g := d * complex(scaling, 0)
-			m := B1*w.States[StateM][ii] + (1-B1)*g
-			v := B2*w.States[StateV][ii] + (1-B2)*g*g
-			w.States[StateM][ii] = m
-			w.States[StateV][ii] = v
-			mhat := m / (1 - complex(b1, 0))
-			vhat := v / (1 - complex(b2, 0))
-			if cmplx.Abs(vhat) < 0 {
-				vhat = 0
+	for range iterations {
+		iteration := q.Iteration
+		pow := func(x float64) float64 {
+			y := math.Pow(x, float64(iteration+1))
+			if math.IsNaN(y) || math.IsInf(y, 0) {
+				return 0
 			}
-			w.X[ii] -= Eta * mhat / (cmplx.Sqrt(vhat) + 1e-8)
+			return y
 		}
+
+		q.Set.Zero()
+		q.Others.Zero()
+		l = tc128.Gradient(loss).X[0]
+		if cmplx.IsNaN(l) || cmplx.IsInf(l) {
+			fmt.Println(iteration, l)
+			return nil, Matrix[complex128]{}
+		}
+
+		norm := 0.0
+		for _, p := range q.Set.Weights {
+			for _, d := range p.D {
+				norm += cmplx.Abs(d) * cmplx.Abs(d)
+			}
+		}
+		norm = math.Sqrt(norm)
+		b1, b2 := pow(B1), pow(B2)
+		scaling := 1.0
+		if norm > 1 {
+			scaling = 1 / norm
+		}
+		for _, w := range q.Set.Weights {
+			for ii, d := range w.D {
+				g := d * complex(scaling, 0)
+				m := B1*w.States[StateM][ii] + (1-B1)*g
+				v := B2*w.States[StateV][ii] + (1-B2)*g*g
+				w.States[StateM][ii] = m
+				w.States[StateV][ii] = v
+				mhat := m / (1 - complex(b1, 0))
+				vhat := v / (1 - complex(b2, 0))
+				if cmplx.Abs(vhat) < 0 {
+					vhat = 0
+				}
+				w.X[ii] -= Eta * mhat / (cmplx.Sqrt(vhat) + 1e-8)
+			}
+		}
+		q.Iteration++
 	}
-	q.Iteration++
 	fmt.Println(l)
 
 	v := q.Set.ByName["v"]
@@ -218,7 +220,7 @@ func Simulate(epochs int, iterate func(iterations int) (*tc128.V, Matrix[complex
 	var gshist plotter.Values
 	for epoch := range epochs {
 		fmt.Println(epoch)
-		g, x := iterate(512)
+		g, x := iterate(1)
 		if epoch < 1024 {
 			image := image.NewPaletted(image.Rect(0, 0, 1024, 1024), palette)
 			type Offset struct {
