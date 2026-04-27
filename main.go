@@ -64,6 +64,7 @@ type QG struct {
 	X         Matrix[complex128]
 	Others    *tc128.Set
 	Set       *tc128.Set
+	Loss      plotter.XYs
 }
 
 // NewQG creates a new quantum gravity model
@@ -113,6 +114,7 @@ func NewQG(rows, cols int) QG {
 		X:      x,
 		Others: &others,
 		Set:    &set,
+		Loss:   make(plotter.XYs, 0, 8),
 	}
 }
 
@@ -194,6 +196,7 @@ func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
 				w.X[ii] -= Eta * mhat / (cmplx.Sqrt(vhat) + 1e-8)
 			}
 		}
+		q.Loss = append(q.Loss, plotter.XY{X: float64(iteration), Y: math.Log10(cmplx.Abs(l))})
 		q.Iteration++
 	}
 	fmt.Println(l)
@@ -378,4 +381,25 @@ func main() {
 	flag.Parse()
 	q := NewQG(33, 33)
 	Simulate(*FlagEpochs*1024, q.Iterate)
+
+	{
+		p := plot.New()
+
+		p.Title.Text = "loss vs iteration"
+		p.X.Label.Text = "iteration"
+		p.Y.Label.Text = "log loss"
+
+		scatter, err := plotter.NewScatter(q.Loss)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "loss.png")
+		if err != nil {
+			panic(err)
+		}
+	}
 }

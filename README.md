@@ -32,3 +32,5 @@ V is then used to update the point particle positions and R.
 ![point masses](verse.gif?raw=true)
 ## G calculation
 ![G](Gavg.png?raw=true)
+## Learning loss
+![loss](loss.png?raw=true)
