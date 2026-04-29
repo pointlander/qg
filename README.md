@@ -31,7 +31,7 @@ V is then used to update the point particle positions and R.
 ## Discussion
 The above equation may describe a multiverse.
 If the `V^2` is dropped from one side, the equation makes for a strong clustering algorithm.
-The overall form of the equation uses Heisenberg's non-commutative: A*B != B*A.
+The overall form of the equation uses Heisenberg's non-commutative: `A*B != B*A`.
 In general the equation computes truth that contradicts itself.
 ## Simulation
 ![point masses](verse.gif?raw=true)
