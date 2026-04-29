@@ -65,6 +65,7 @@ type QG struct {
 	Others    *tc128.Set
 	Set       *tc128.Set
 	Loss      plotter.XYs
+	Images    *gif.GIF
 }
 
 // NewQG creates a new quantum gravity model
@@ -115,11 +116,12 @@ func NewQG(rows, cols int) QG {
 		Others: &others,
 		Set:    &set,
 		Loss:   make(plotter.XYs, 0, 8),
+		Images: &gif.GIF{},
 	}
 }
 
 // Iterate iterates the g model
-func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
+func (q *QG) Iterate(iterations int) *tc128.V {
 	x, index := q.Others.ByName["x"], 0
 	for i := range q.X.Rows {
 		for j := range q.X.Rows {
@@ -166,7 +168,7 @@ func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
 		l = tc128.Gradient(loss).X[0]
 		if cmplx.IsNaN(l) || cmplx.IsInf(l) {
 			fmt.Println(iteration, l)
-			return nil, Matrix[complex128]{}
+			return nil
 		}
 
 		norm := 0.0
@@ -211,64 +213,63 @@ func (q *QG) Iterate(iterations int) (*tc128.V, Matrix[complex128]) {
 		q.X.Data[i*q.X.Cols+1] += v.X[i*v.S[0]+0] * v.X[i*v.S[0]+2]
 		q.X.Data[i*q.X.Cols+2] += v.X[i*v.S[0]+1] * v.X[i*v.S[0]+2]
 	}
+	if q.Iteration < 1024 {
+		image := image.NewPaletted(image.Rect(0, 0, 1024, 1024), palette)
+		type Offset struct {
+			X int
+			Y int
+			A int
+			B int
+		}
+		offsets := []Offset{{0, 0, 0, 1}, {512, 0, 0, 2}, {0, 512, 1, 2}}
+		for _, offset := range offsets {
+			minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
+			for i := range q.X.Rows {
+				x, y := cmplx.Abs(q.X.Data[i*q.X.Cols+offset.A]), cmplx.Abs(q.X.Data[i*q.X.Cols+offset.B])
+				if x < minX {
+					minX = x
+				}
+				if x > maxX {
+					maxX = x
+				}
+				if y < minY {
+					minY = y
+				}
+				if y > maxY {
+					maxY = y
+				}
+			}
+			for i := range q.X.Rows {
+				xx, yy := cmplx.Abs(q.X.Data[i*q.X.Cols+offset.A]), cmplx.Abs(q.X.Data[i*q.X.Cols+offset.B])
+				x := 500*(xx-minX)/(maxX-minX) + 6
+				y := 500*(yy-minY)/(maxY-minY) + 6
+				image.Set(offset.X+int(x), offset.Y+int(y), color.RGBA{0xff, 0xff, 0xff, 0xff})
+			}
+			for i := range 1024 {
+				image.Set(512, i, color.RGBA{0xff, 0xff, 0xff, 0xff})
+				image.Set(i, 512, color.RGBA{0xff, 0xff, 0xff, 0xff})
+			}
+			for i := range 512 {
+				for ii := range 4 {
+					image.Set(int(float64(q.Iteration*i)/float64(1024))+512, 1023-ii, color.RGBA{0xff, 0xff, 0xff, 0xff})
+				}
+			}
+		}
+		q.Images.Image = append(q.Images.Image, image)
+		q.Images.Delay = append(q.Images.Delay, 10)
+	}
 
-	return q.Set.ByName["g"], q.X
+	return q.Set.ByName["g"]
 }
 
 // Simulate runs the simulation
-func Simulate(epochs int, iterate func(iterations int) (*tc128.V, Matrix[complex128])) {
-	images := &gif.GIF{}
+func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) {
 	gs := make(plotter.XYs, 0, 8)
 	gavg := make(plotter.XYs, 0, 8)
 	var gshist plotter.Values
 	for epoch := range epochs {
 		fmt.Println(epoch)
-		g, x := iterate(1)
-		if epoch < 1024 {
-			image := image.NewPaletted(image.Rect(0, 0, 1024, 1024), palette)
-			type Offset struct {
-				X int
-				Y int
-				A int
-				B int
-			}
-			offsets := []Offset{{0, 0, 0, 1}, {512, 0, 0, 2}, {0, 512, 1, 2}}
-			for _, offset := range offsets {
-				minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
-				for i := range x.Rows {
-					x, y := cmplx.Abs(x.Data[i*x.Cols+offset.A]), cmplx.Abs(x.Data[i*x.Cols+offset.B])
-					if x < minX {
-						minX = x
-					}
-					if x > maxX {
-						maxX = x
-					}
-					if y < minY {
-						minY = y
-					}
-					if y > maxY {
-						maxY = y
-					}
-				}
-				for i := range x.Rows {
-					xx, yy := cmplx.Abs(x.Data[i*x.Cols+offset.A]), cmplx.Abs(x.Data[i*x.Cols+offset.B])
-					x := 500*(xx-minX)/(maxX-minX) + 6
-					y := 500*(yy-minY)/(maxY-minY) + 6
-					image.Set(offset.X+int(x), offset.Y+int(y), color.RGBA{0xff, 0xff, 0xff, 0xff})
-				}
-				for i := range 1024 {
-					image.Set(512, i, color.RGBA{0xff, 0xff, 0xff, 0xff})
-					image.Set(i, 512, color.RGBA{0xff, 0xff, 0xff, 0xff})
-				}
-				for i := range 512 {
-					for ii := range 4 {
-						image.Set(int(float64(epoch*i)/float64(epochs))+512, 1023-ii, color.RGBA{0xff, 0xff, 0xff, 0xff})
-					}
-				}
-			}
-			images.Image = append(images.Image, image)
-			images.Delay = append(images.Delay, 10)
-		}
+		g := iterate(1)
 		avg := complex128(0.0)
 		for _, value := range g.X {
 			avg += value
@@ -290,18 +291,6 @@ func Simulate(epochs int, iterate func(iterations int) (*tc128.V, Matrix[complex
 	}
 
 	{
-		out, err := os.Create("verse.gif")
-		if err != nil {
-			panic(err)
-		}
-		defer out.Close()
-		err = gif.EncodeAll(out, images)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	{
 		p := plot.New()
 
 		p.Title.Text = "imag vs real"
@@ -316,7 +305,7 @@ func Simulate(epochs int, iterate func(iterations int) (*tc128.V, Matrix[complex
 		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
 		p.Add(scatter)
 
-		err = p.Save(8*vg.Inch, 8*vg.Inch, "G.png")
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sG.png", prefix))
 		if err != nil {
 			panic(err)
 		}
@@ -337,7 +326,7 @@ func Simulate(epochs int, iterate func(iterations int) (*tc128.V, Matrix[complex
 		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
 		p.Add(scatter)
 
-		err = p.Save(8*vg.Inch, 8*vg.Inch, "Gavg.png")
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sGavg.png", prefix))
 		if err != nil {
 			panic(err)
 		}
@@ -380,7 +369,20 @@ var (
 func main() {
 	flag.Parse()
 	q := NewQG(33, 33)
-	Simulate(*FlagEpochs*1024, q.Iterate)
+	prefix := ""
+	Simulate(prefix, *FlagEpochs*1024, q.Iterate)
+
+	{
+		out, err := os.Create(fmt.Sprintf("%sverse.gif", prefix))
+		if err != nil {
+			panic(err)
+		}
+		defer out.Close()
+		err = gif.EncodeAll(out, q.Images)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	{
 		p := plot.New()
@@ -397,7 +399,7 @@ func main() {
 		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
 		p.Add(scatter)
 
-		err = p.Save(8*vg.Inch, 8*vg.Inch, "loss.png")
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sloss.png", prefix))
 		if err != nil {
 			panic(err)
 		}
