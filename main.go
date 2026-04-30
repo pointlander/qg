@@ -262,6 +262,162 @@ func (q *QG) Iterate(iterations int) *tc128.V {
 	return q.Set.ByName["g"]
 }
 
+// Q is a quantum gravity model
+type Q struct {
+	Iteration int
+	Rng       *rand.Rand
+	Set       *tc128.Set
+	Loss      plotter.XYs
+	Images    *gif.GIF
+}
+
+// NewQG creates a new quantum gravity model
+func NewQ(rows, cols int) Q {
+	rng := rand.New(rand.NewSource(1))
+
+	set := tc128.NewSet()
+	set.Add("v", 2, rows)
+	set.Add("g", cols, rows)
+	set.Add("x", cols, rows)
+
+	for ii := range set.Weights {
+		w := set.Weights[ii]
+		if strings.HasPrefix(w.N, "b") {
+			w.X = w.X[:cap(w.X)]
+			w.States = make([][]complex128, StateTotal)
+			for ii := range w.States {
+				w.States[ii] = make([]complex128, len(w.X))
+			}
+			continue
+		}
+		factor := math.Sqrt(2.0/float64(w.S[0])) * .1
+		for range cap(w.X) {
+			w.X = append(w.X, complex(rng.NormFloat64()*factor, rng.NormFloat64()*factor))
+		}
+		w.States = make([][]complex128, StateTotal)
+		for ii := range w.States {
+			w.States[ii] = make([]complex128, len(w.X))
+		}
+	}
+
+	return Q{
+		Rng:    rng,
+		Set:    &set,
+		Loss:   make(plotter.XYs, 0, 8),
+		Images: &gif.GIF{},
+	}
+}
+
+// Iterate iterates the g model
+func (q *Q) Iterate(iterations int) *tc128.V {
+	drop := .3
+	dropout := map[string]interface{}{
+		"rng":  q.Rng,
+		"drop": &drop,
+	}
+
+	l0 := tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout),
+		tc128.Hadamard(q.Set.Get("x"), q.Set.Get("g")))
+	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(q.Set.Get("x"), q.Set.Get("g")),
+		tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout)), l0))
+
+	var l complex128
+	for range iterations {
+		iteration := q.Iteration
+		pow := func(x float64) float64 {
+			y := math.Pow(x, float64(iteration+1))
+			if math.IsNaN(y) || math.IsInf(y, 0) {
+				return 0
+			}
+			return y
+		}
+
+		q.Set.Zero()
+		l = tc128.Gradient(loss).X[0]
+		if cmplx.IsNaN(l) || cmplx.IsInf(l) {
+			fmt.Println(iteration, l)
+			return nil
+		}
+
+		norm := 0.0
+		for _, p := range q.Set.Weights {
+			for _, d := range p.D {
+				norm += cmplx.Abs(d) * cmplx.Abs(d)
+			}
+		}
+		norm = math.Sqrt(norm)
+		b1, b2 := pow(B1), pow(B2)
+		scaling := 1.0
+		if norm > 1 {
+			scaling = 1 / norm
+		}
+		for _, w := range q.Set.Weights {
+			for ii, d := range w.D {
+				g := d * complex(scaling, 0)
+				m := B1*w.States[StateM][ii] + (1-B1)*g
+				v := B2*w.States[StateV][ii] + (1-B2)*g*g
+				w.States[StateM][ii] = m
+				w.States[StateV][ii] = v
+				mhat := m / (1 - complex(b1, 0))
+				vhat := v / (1 - complex(b2, 0))
+				if cmplx.Abs(vhat) < 0 {
+					vhat = 0
+				}
+				w.X[ii] -= Eta * mhat / (cmplx.Sqrt(vhat) + 1e-8)
+			}
+		}
+		q.Loss = append(q.Loss, plotter.XY{X: float64(iteration), Y: math.Log10(cmplx.Abs(l))})
+		q.Iteration++
+	}
+	fmt.Println(l)
+
+	v := q.Set.ByName["v"]
+	if q.Iteration < 1024 {
+		image := image.NewPaletted(image.Rect(0, 0, 512, 512), palette)
+		type Offset struct {
+			X int
+			Y int
+			A int
+			B int
+		}
+		minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
+		for i := range v.S[1] {
+			x, y := cmplx.Abs(v.X[i*v.S[0]]), cmplx.Abs(v.X[i*v.S[0]+1])
+			if x < minX {
+				minX = x
+			}
+			if x > maxX {
+				maxX = x
+			}
+			if y < minY {
+				minY = y
+			}
+			if y > maxY {
+				maxY = y
+			}
+		}
+		for i := range v.S[1] {
+			xx, yy := cmplx.Abs(v.X[i*v.S[0]]), cmplx.Abs(v.X[i*v.S[0]+1])
+			x := 500*(xx-minX)/(maxX-minX) + 6
+			y := 500*(yy-minY)/(maxY-minY) + 6
+			image.Set(int(x), int(y), color.RGBA{0xff, 0xff, 0xff, 0xff})
+		}
+		for i := range 1024 {
+			image.Set(512, i, color.RGBA{0xff, 0xff, 0xff, 0xff})
+			image.Set(i, 512, color.RGBA{0xff, 0xff, 0xff, 0xff})
+		}
+		for i := range 512 {
+			for ii := range 4 {
+				image.Set(int(float64(q.Iteration*i)/float64(1024)), 511-ii, color.RGBA{0xff, 0xff, 0xff, 0xff})
+			}
+		}
+		q.Images.Image = append(q.Images.Image, image)
+		q.Images.Delay = append(q.Images.Delay, 10)
+	}
+
+	return q.Set.ByName["g"]
+}
+
 // Simulate runs the simulation
 func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) {
 	gs := make(plotter.XYs, 0, 8)
@@ -403,5 +559,45 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+	}
+
+	{
+		q := NewQ(33, 33)
+		prefix := "q_"
+		Simulate(prefix, *FlagEpochs*1024, q.Iterate)
+
+		{
+			out, err := os.Create(fmt.Sprintf("%sverse.gif", prefix))
+			if err != nil {
+				panic(err)
+			}
+			defer out.Close()
+			err = gif.EncodeAll(out, q.Images)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		{
+			p := plot.New()
+
+			p.Title.Text = "loss vs iteration"
+			p.X.Label.Text = "iteration"
+			p.Y.Label.Text = "log loss"
+
+			scatter, err := plotter.NewScatter(q.Loss)
+			if err != nil {
+				panic(err)
+			}
+			scatter.GlyphStyle.Radius = vg.Length(1)
+			scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+			p.Add(scatter)
+
+			err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sloss.png", prefix))
+			if err != nil {
+				panic(err)
+			}
+		}
+
 	}
 }
