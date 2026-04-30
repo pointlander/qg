@@ -278,7 +278,7 @@ func NewQ(rows, cols int) Q {
 	set := tc128.NewSet()
 	set.Add("v", 2, rows)
 	set.Add("g", cols, rows)
-	set.Add("x", cols, rows)
+	set.Add("x", 2, rows)
 
 	for ii := range set.Weights {
 		w := set.Weights[ii]
@@ -317,8 +317,8 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 	}
 
 	l0 := tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout),
-		tc128.Hadamard(q.Set.Get("x"), q.Set.Get("g")))
-	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(q.Set.Get("x"), q.Set.Get("g")),
+		tc128.Hadamard(tc128.Inv(tc128.Square(q.Set.Get("x"))), q.Set.Get("g")))
+	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(tc128.Inv(tc128.Square(q.Set.Get("x"))), q.Set.Get("g")),
 		tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout)), l0))
 
 	var l complex128
@@ -520,48 +520,14 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 var (
 	// FlagEpochs number of epochs
 	FlagEpochs = flag.Int("e", 1, "number of epochs")
+	// FlagQ q mode
+	FlagQ = flag.Bool("q", false, "q mode")
 )
 
 func main() {
 	flag.Parse()
-	q := NewQG(33, 33)
-	prefix := ""
-	Simulate(prefix, *FlagEpochs*1024, q.Iterate)
 
-	{
-		out, err := os.Create(fmt.Sprintf("%sverse.gif", prefix))
-		if err != nil {
-			panic(err)
-		}
-		defer out.Close()
-		err = gif.EncodeAll(out, q.Images)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	{
-		p := plot.New()
-
-		p.Title.Text = "loss vs iteration"
-		p.X.Label.Text = "iteration"
-		p.Y.Label.Text = "log loss"
-
-		scatter, err := plotter.NewScatter(q.Loss)
-		if err != nil {
-			panic(err)
-		}
-		scatter.GlyphStyle.Radius = vg.Length(1)
-		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-		p.Add(scatter)
-
-		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sloss.png", prefix))
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	{
+	if *FlagQ {
 		q := NewQ(33, 33)
 		prefix := "q_"
 		Simulate(prefix, *FlagEpochs*1024, q.Iterate)
@@ -598,6 +564,43 @@ func main() {
 				panic(err)
 			}
 		}
+		return
+	}
 
+	q := NewQG(33, 33)
+	prefix := ""
+	Simulate(prefix, *FlagEpochs*1024, q.Iterate)
+
+	{
+		out, err := os.Create(fmt.Sprintf("%sverse.gif", prefix))
+		if err != nil {
+			panic(err)
+		}
+		defer out.Close()
+		err = gif.EncodeAll(out, q.Images)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	{
+		p := plot.New()
+
+		p.Title.Text = "loss vs iteration"
+		p.X.Label.Text = "iteration"
+		p.Y.Label.Text = "log loss"
+
+		scatter, err := plotter.NewScatter(q.Loss)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sloss.png", prefix))
+		if err != nil {
+			panic(err)
+		}
 	}
 }
