@@ -57,8 +57,8 @@ func init() {
 	}
 }
 
-// Quadratic computes the quadratic cost of two tensors
-func Quadratic(k tc128.Continuation, node int, a, b *tc128.V, options ...map[string]interface{}) bool {
+// Euclidean computes the euclidean distance between all row vectors and all row vectors
+func Euclidean(k tc128.Continuation, node int, a, b *tc128.V, options ...map[string]interface{}) bool {
 	if len(a.S) != 2 || len(b.S) != 2 {
 		panic("tensor needs to have two dimensions")
 	}
@@ -66,26 +66,33 @@ func Quadratic(k tc128.Continuation, node int, a, b *tc128.V, options ...map[str
 	if width != b.S[0] || a.S[1] != b.S[1] {
 		panic("dimensions are not the same")
 	}
-	c, size := tc128.NewV(a.S[1]), len(a.X)
-	for i := 0; i < size; i += width {
-		av, bv, sum := a.X[i:i+width], b.X[i:i+width], complex128(0.0)
-		for j, ax := range av {
-			p := (ax - bv[j])
-			sum += p * p
+	c, sizeA, sizeB := tc128.NewV(a.S[1], b.S[1]), len(a.X), len(b.X)
+	for i := 0; i < sizeA; i += width {
+		for ii := 0; ii < sizeB; ii += width {
+			av, bv, sum := a.X[i:i+width], b.X[ii:ii+width], complex128(0.0)
+			for j, ax := range av {
+				diff := (ax - bv[j])
+				sum += diff * diff
+			}
+			c.X = append(c.X, cmplx.Sqrt(sum))
 		}
-		c.X = append(c.X, .5*sum)
 	}
 	if k(&c) {
 		return true
 	}
 	index := 0
-	for i := 0; i < size; i += width {
-		av, bv, ad, bd, d := a.X[i:i+width], b.X[i:i+width], a.D[i:i+width], b.D[i:i+width], c.D[index]
-		for j, ax := range av {
-			ad[j] += (ax - bv[j]) * d
-			bd[j] += (bv[j] - ax) * d
+	for i := 0; i < sizeA; i += width {
+		for ii := 0; ii < sizeB; ii += width {
+			av, bv, cx, ad, bd, d := a.X[i:i+width], b.X[ii:ii+width], c.X[index], a.D[i:i+width], b.D[ii:ii+width], c.D[index]
+			for j, ax := range av {
+				if cx == 0 {
+					continue
+				}
+				ad[j] += (ax - bv[j]) * d / cx
+				bd[j] += (bv[j] - ax) * d / cx
+			}
+			index++
 		}
-		index++
 	}
 	return false
 }
@@ -349,9 +356,11 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 		"drop": &drop,
 	}
 
+	euclidean := tc128.B(Euclidean)
+
 	l0 := tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout),
-		tc128.Hadamard(tc128.Inv(tc128.Square(q.Set.Get("x"))), q.Set.Get("g")))
-	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(tc128.Inv(tc128.Square(q.Set.Get("x"))), q.Set.Get("g")),
+		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), q.Set.Get("g")))
+	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), q.Set.Get("g")),
 		tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout)), l0))
 
 	var l complex128
