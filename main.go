@@ -57,6 +57,39 @@ func init() {
 	}
 }
 
+// Quadratic computes the quadratic cost of two tensors
+func Quadratic(k tc128.Continuation, node int, a, b *tc128.V, options ...map[string]interface{}) bool {
+	if len(a.S) != 2 || len(b.S) != 2 {
+		panic("tensor needs to have two dimensions")
+	}
+	width := a.S[0]
+	if width != b.S[0] || a.S[1] != b.S[1] {
+		panic("dimensions are not the same")
+	}
+	c, size := tc128.NewV(a.S[1]), len(a.X)
+	for i := 0; i < size; i += width {
+		av, bv, sum := a.X[i:i+width], b.X[i:i+width], complex128(0.0)
+		for j, ax := range av {
+			p := (ax - bv[j])
+			sum += p * p
+		}
+		c.X = append(c.X, .5*sum)
+	}
+	if k(&c) {
+		return true
+	}
+	index := 0
+	for i := 0; i < size; i += width {
+		av, bv, ad, bd, d := a.X[i:i+width], b.X[i:i+width], a.D[i:i+width], b.D[i:i+width], c.D[index]
+		for j, ax := range av {
+			ad[j] += (ax - bv[j]) * d
+			bd[j] += (bv[j] - ax) * d
+		}
+		index++
+	}
+	return false
+}
+
 // QG is a quantum gravity model
 type QG struct {
 	Iteration int
