@@ -11,8 +11,8 @@ import (
 	"math"
 	"math/cmplx"
 	"os"
-	//"runtime"
-	//"sync/atomic"
+	"runtime"
+	"sync/atomic"
 )
 
 const (
@@ -513,6 +513,21 @@ func dot[T Float](x, y []T) (z T) {
 	return z
 }
 
+func abs[T Float](x T) T {
+	switch v := any(x).(type) {
+	case float32:
+		return any(float32(math.Abs(float64(v)))).(T)
+	case float64:
+		return any(math.Abs(v)).(T)
+	case complex64:
+		return any(complex(cmplx.Abs(complex128(v)), 0)).(T)
+	case complex128:
+		return any(complex(cmplx.Abs(v), 0)).(T)
+	default:
+		return x
+	}
+}
+
 func sqrt[T Float](x T) T {
 	switch v := any(x).(type) {
 	case float32:
@@ -786,18 +801,15 @@ func (r *RNG) Intn(n int) int {
 }
 
 // PageRank is a counting based pagerank implementation
-/*func PageRank[T Float](a float32, e int, seed uint32, adj Matrix[T]) Matrix[T] {
+func PageRank[T Float](a float32, e int, seed uint32, adj Matrix[T]) Matrix[T] {
 	for i := range adj.Rows {
 		var sum T
 		for ii := range adj.Cols {
-			value := adj.Data[i*adj.Cols+ii]
-			if value < 0 {
-				value = -value
-			}
+			value := abs(adj.Data[i*adj.Cols+ii])
 			sum += value
 		}
 		for ii := range adj.Cols {
-			adj.Data[i*adj.Cols+ii] /= sum
+			adj.Data[i*adj.Cols+ii] = abs(adj.Data[i*adj.Cols+ii]) / sum
 		}
 	}
 	counts := make([]int64, adj.Cols)
@@ -810,28 +822,103 @@ func (r *RNG) Intn(n int) int {
 			if rng.Float32() > a {
 				node = rng.Intn(adj.Cols)
 			}
-			total, selected, found, negative := T(0.0), T(rng.Float32()), false, false
-			for i, weight := range adj.Data[node*adj.Cols : (node+1)*adj.Cols] {
-				total += weight
-				if weight < 0 {
-					negative = true
-					weight = -weight
+			switch data := any(adj.Data).(type) {
+			case []float32:
+				total, selected, found, negative := float32(0.0), rng.Float32(), false, false
+				for i, weight := range data[node*adj.Cols : (node+1)*adj.Cols] {
+					total += weight
+					if weight < 0 {
+						negative = true
+						weight = -weight
+					} else {
+						negative = false
+					}
+					if selected < total {
+						node, found = i, true
+						break
+					}
+				}
+				if !found {
+					node = rng.Intn(adj.Cols)
+				}
+				counter := &counts[node]
+				if negative {
+					atomic.AddInt64(counter, -1)
 				} else {
-					negative = false
+					atomic.AddInt64(counter, 1)
 				}
-				if selected < total {
-					node, found = i, true
-					break
+			case []float64:
+				total, selected, found, negative := float64(0.0), float64(rng.Float32()), false, false
+				for i, weight := range data[node*adj.Cols : (node+1)*adj.Cols] {
+					total += weight
+					if weight < 0 {
+						negative = true
+						weight = -weight
+					} else {
+						negative = false
+					}
+					if selected < total {
+						node, found = i, true
+						break
+					}
 				}
-			}
-			if !found {
-				node = rng.Intn(adj.Cols)
-			}
-			counter := &counts[node]
-			if negative {
-				atomic.AddInt64(counter, -1)
-			} else {
-				atomic.AddInt64(counter, 1)
+				if !found {
+					node = rng.Intn(adj.Cols)
+				}
+				counter := &counts[node]
+				if negative {
+					atomic.AddInt64(counter, -1)
+				} else {
+					atomic.AddInt64(counter, 1)
+				}
+			case []complex64:
+				total, selected, found, negative := complex64(0.0), complex(rng.Float32(), rng.Float32()), false, false
+				for i, weight := range data[node*adj.Cols : (node+1)*adj.Cols] {
+					total += abs(weight)
+					if real(abs(weight)) < 0 {
+						negative = true
+						weight = -weight
+					} else {
+						negative = false
+					}
+					if real(abs(selected)) < real(abs(total)) {
+						node, found = i, true
+						break
+					}
+				}
+				if !found {
+					node = rng.Intn(adj.Cols)
+				}
+				counter := &counts[node]
+				if negative {
+					atomic.AddInt64(counter, -1)
+				} else {
+					atomic.AddInt64(counter, 1)
+				}
+			case []complex128:
+				total, selected, found, negative := complex128(0.0), complex(float64(rng.Float32()), float64(rng.Float32())), false, false
+				for i, weight := range data[node*adj.Cols : (node+1)*adj.Cols] {
+					total += abs(weight)
+					if real(abs(weight)) < 0 {
+						negative = true
+						weight = -weight
+					} else {
+						negative = false
+					}
+					if real(abs(selected)) < real(abs(total)) {
+						node, found = i, true
+						break
+					}
+				}
+				if !found {
+					node = rng.Intn(adj.Cols)
+				}
+				counter := &counts[node]
+				if negative {
+					atomic.AddInt64(counter, -1)
+				} else {
+					atomic.AddInt64(counter, 1)
+				}
 			}
 		}
 		done <- true
@@ -865,10 +952,10 @@ func (r *RNG) Intn(n int) int {
 	}
 	p := NewMatrix[T](len(counts), 1)
 	for _, value := range counts {
-		p.Data = append(p.Data, T(value)/T(sum))
+		p.Data = append(p.Data, any(value).(T)/any(sum).(T))
 	}
 	return p
-}*/
+}
 
 // Transformer implements transform inference
 func Transformer[T Float](set Set[T], inputs, outputs Matrix[T]) Matrix[T] {
