@@ -462,7 +462,7 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 
 // Simulate runs the simulation
 func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) {
-	gs := make(plotter.XYs, 0, 8)
+	//gs := make(plotter.XYs, 0, 8)
 	gavg := make(plotter.XYs, 0, 8)
 	var gshist plotter.Values
 	for epoch := range epochs {
@@ -483,12 +483,12 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 		fmt.Println("G", avg, stddev)
 		gavg = append(gavg, plotter.XY{X: real(avg), Y: imag(avg)})
 		for _, v := range g.X {
-			gs = append(gs, plotter.XY{X: real(v), Y: imag(v)})
+			//gs = append(gs, plotter.XY{X: real(v), Y: imag(v)})
 			gshist = append(gshist, float64(cmplx.Abs(v)))
 		}
 	}
 
-	{
+	/*{
 		p := plot.New()
 
 		p.Title.Text = "imag vs real"
@@ -507,7 +507,7 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 		if err != nil {
 			panic(err)
 		}
-	}
+	}*/
 
 	{
 		p := plot.New()
