@@ -577,13 +577,33 @@ func (c C128) Exp() C128 {
 func exp[T Float](x T) T {
 	switch v := any(x).(type) {
 	case float32:
-		return any(float32(math.Exp(float64(v)))).(T)
+		switch v := any(float32(math.Exp(float64(v)))).(type) {
+		case T:
+			return v
+		default:
+			return x
+		}
 	case float64:
-		return any(math.Exp(v)).(T)
+		switch v := any(math.Exp(v)).(type) {
+		case T:
+			return v
+		default:
+			return x
+		}
 	case complex64:
-		return any(complex64(cmplx.Exp(complex128(v)))).(T)
+		switch v := any(complex64(cmplx.Exp(complex128(v)))).(type) {
+		case T:
+			return v
+		default:
+			return x
+		}
 	case complex128:
-		return any(cmplx.Exp(v)).(T)
+		switch v := any(complex128(cmplx.Exp(v))).(type) {
+		case T:
+			return v
+		default:
+			return x
+		}
 	default:
 		return x
 	}
