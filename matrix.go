@@ -543,6 +543,37 @@ func sqrt[T Float](x T) T {
 	}
 }
 
+type (
+	F32  float32
+	F64  float64
+	C64  complex64
+	C128 complex128
+)
+
+type Number interface {
+	F32 | F64 | C64 | C128
+}
+
+type Math[T Number] interface {
+	Exp() T
+}
+
+func (f F32) Exp() F32 {
+	return F32(math.Exp(float64(f)))
+}
+
+func (f F64) Exp() F64 {
+	return F64(math.Exp(float64(f)))
+}
+
+func (c C64) Exp() C64 {
+	return C64(cmplx.Exp(complex128(c)))
+}
+
+func (c C128) Exp() C128 {
+	return C128(cmplx.Exp(complex128(c)))
+}
+
 func exp[T Float](x T) T {
 	switch v := any(x).(type) {
 	case float32:
