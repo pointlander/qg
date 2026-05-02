@@ -31,7 +31,7 @@ func BenchmarkExpControl(b *testing.B) {
 	}
 }
 
-func BenchmarkExpFF(b *testing.B) {
+func BenchmarkExpDirect(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		a := F32(1.0)
 		a.Exp()
@@ -44,12 +44,16 @@ func BenchmarkExpFF(b *testing.B) {
 	}
 }
 
-func BenchmarkExpF(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		M[F32]{V: F32(1.0)}.X()
-		M[F64]{V: F64(1.0)}.X()
-		M[C64]{V: C64(1.0)}.X()
-		M[C128]{V: C128(1.0)}.X()
+func BenchmarkExpMatrix(bb *testing.B) {
+	a := M[F32]{V: F32(1.0)}
+	b := M[F64]{V: F64(1.0)}
+	c := M[C64]{V: C64(1.0)}
+	d := M[C128]{V: C128(1.0)}
+	for i := 0; i < bb.N; i++ {
+		_ = a.X() + a.V.(F32)
+		_ = b.X() + b.V.(F64)
+		_ = c.X() + c.V.(C64)
+		_ = d.X() + d.V.(C128)
 	}
 }
 
