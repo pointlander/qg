@@ -318,7 +318,7 @@ func NewQ(rows, cols int) Q {
 	set := tc128.NewSet()
 	set.Add("v", 2, rows)
 	set.Add("g", cols, rows)
-	set.Add("x", 2, rows)
+	//set.Add("x", 2, rows)
 
 	for ii := range set.Weights {
 		w := set.Weights[ii]
@@ -359,8 +359,8 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 	euclidean := tc128.B(Euclidean)
 
 	l0 := tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout),
-		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), q.Set.Get("g")))
-	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), q.Set.Get("g")),
+		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("v"), q.Set.Get("v"))), q.Set.Get("g")))
+	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("v"), q.Set.Get("v"))), q.Set.Get("g")),
 		tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout)), l0))
 
 	var l complex128
