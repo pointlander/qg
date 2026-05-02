@@ -244,7 +244,7 @@ func (m Matrix[T]) Sigmoid() Matrix[T] {
 }
 
 // ReLu is the ramp function
-/*func (m Matrix[T]) ReLu() Matrix[T] {
+func (m Matrix[T]) ReLu() Matrix[T] {
 	o := Matrix[T]{
 		Size: Size{
 			Cols: m.Cols,
@@ -252,17 +252,49 @@ func (m Matrix[T]) Sigmoid() Matrix[T] {
 		},
 		Data: make([]T, 0, m.Cols*m.Rows),
 	}
-	for _, value := range m.Data {
-		if value < 0 {
-			value = 0
+	switch data := any(m.Data).(type) {
+	case []float32:
+		for _, value := range data {
+			if value < 0 {
+				value = 0
+			}
+			o.Data = append(o.Data, any(value).(T))
 		}
-		o.Data = append(o.Data, value)
+	case []float64:
+		for _, value := range data {
+			if value < 0 {
+				value = 0
+			}
+			o.Data = append(o.Data, any(value).(T))
+		}
+	case []complex64:
+		for _, value := range data {
+			a, b := real(value), imag(value)
+			if a < 0 {
+				a = 0
+			}
+			if b < 0 {
+				b = 0
+			}
+			o.Data = append(o.Data, any(complex(a, b)).(T))
+		}
+	case []complex128:
+		for _, value := range data {
+			a, b := real(value), imag(value)
+			if a < 0 {
+				a = 0
+			}
+			if b < 0 {
+				b = 0
+			}
+			o.Data = append(o.Data, any(complex(a, b)).(T))
+		}
 	}
 	return o
-}*/
+}
 
 // Everett is the everett activation function
-/*func (m Matrix[T]) Everett() Matrix[T] {
+func (m Matrix[T]) Everett() Matrix[T] {
 	o := Matrix[T]{
 		Size: Size{
 			Cols: 2 * m.Cols,
@@ -270,33 +302,87 @@ func (m Matrix[T]) Sigmoid() Matrix[T] {
 		},
 		Data: make([]T, 0, 2*m.Cols*m.Rows),
 	}
-	for _, value := range m.Data {
-		positive := value
-		if positive < 0 {
-			positive = 0
+	switch data := any(m.Data).(type) {
+	case []float32:
+		for _, value := range data {
+			positive := value
+			if positive < 0 {
+				positive = 0
+			}
+			o.Data = append(o.Data, any(positive).(T))
+			negative := value
+			if negative > 0 {
+				negative = 0
+			}
+			o.Data = append(o.Data, any(negative).(T))
 		}
-		o.Data = append(o.Data, positive)
-		negative := value
-		if negative > 0 {
-			negative = 0
+	case []float64:
+		for _, value := range data {
+			positive := value
+			if positive < 0 {
+				positive = 0
+			}
+			o.Data = append(o.Data, any(positive).(T))
+			negative := value
+			if negative > 0 {
+				negative = 0
+			}
+			o.Data = append(o.Data, any(negative).(T))
 		}
-		o.Data = append(o.Data, negative)
+	case []complex64:
+		for _, value := range data {
+			a, b := real(value), imag(value)
+			if a < 0 {
+				a = 0
+			}
+			if b < 0 {
+				b = 0
+			}
+			o.Data = append(o.Data, any(complex(a, b)).(T))
+			a, b = real(value), imag(value)
+			if a > 0 {
+				a = 0
+			}
+			if b > 0 {
+				b = 0
+			}
+			o.Data = append(o.Data, any(complex(a, b)).(T))
+		}
+	case []complex128:
+		for _, value := range data {
+			a, b := real(value), imag(value)
+			if a < 0 {
+				a = 0
+			}
+			if b < 0 {
+				b = 0
+			}
+			o.Data = append(o.Data, any(complex(a, b)).(T))
+			a, b = real(value), imag(value)
+			if a > 0 {
+				a = 0
+			}
+			if b > 0 {
+				b = 0
+			}
+			o.Data = append(o.Data, any(complex(a, b)).(T))
+		}
 	}
 	return o
-}*/
+}
 
 // Entropy calculates the entropy of the matrix rows
-/*func (m Matrix[T]) Entropy() Matrix[T] {
+func (m Matrix[T]) Entropy() Matrix[T] {
 	output := NewMatrix[T](m.Rows, 1)
 	for i := 0; i < len(m.Data); i += m.Cols {
 		entropy := T(0.0)
 		for _, value := range m.Data[i : i+m.Cols] {
-			entropy += value * T(math.Log(float64(value)))
+			entropy += value * log(value)
 		}
 		output.Data = append(output.Data, -entropy)
 	}
 	return output
-}*/
+}
 
 // Sum sums the rows of a matrix
 func (m Matrix[T]) Sum() Matrix[T] {
@@ -457,6 +543,21 @@ func exp[T Float](x T) T {
 	}
 }
 
+func log[T Float](x T) T {
+	switch v := any(x).(type) {
+	case float32:
+		return any(float32(math.Log(float64(v)))).(T)
+	case float64:
+		return any(math.Log(v)).(T)
+	case complex64:
+		return any(complex64(cmplx.Log(complex128(v)))).(T)
+	case complex128:
+		return any(cmplx.Log(v)).(T)
+	default:
+		return x
+	}
+}
+
 func max[T Float](x []T) T {
 	switch v := any(x).(type) {
 	case []float32:
@@ -566,41 +667,41 @@ func softmax[T Float](values []T) {
 }
 
 // CS implements cosine similarity
-/*func (m Matrix[T]) CS(n Matrix[T]) T {
+func (m Matrix[T]) CS(n Matrix[T]) T {
 	var sum T
 	var count T
 	for i := 0; i < len(m.Data); i += m.Cols {
 		md := m.Data[i : i+m.Cols]
 		nd := n.Data[i : i+m.Cols]
 		ab, aa, bb := dot(md, nd), dot(md, md), dot(nd, nd)
-		if aa <= 0 || bb <= 0 {
+		if aa == 0 || bb == 0 {
 			continue
 		}
-		sum += ab / (T(math.Sqrt(float64(aa))) * T(math.Sqrt(float64(bb))))
+		sum += ab / (sqrt(aa) * sqrt(bb))
 		count++
 	}
 	return sum / count
-}*/
+}
 
-// CS implements cosine similarity
-/*func (m Matrix[T]) Unit() Matrix[T] {
+// Unit calculates a unit vector
+func (m Matrix[T]) Unit() Matrix[T] {
 	o := NewMatrix[T](m.Cols, m.Rows)
 	for i := 0; i < len(m.Data); i += m.Cols {
 		md := m.Data[i : i+m.Cols]
 		aa := dot(md, md)
-		if aa <= 0 {
+		if aa == 0 {
 			for _, value := range md {
 				o.Data = append(o.Data, value)
 			}
 			continue
 		}
-		aa = T(math.Sqrt(float64(aa)))
+		aa = sqrt(aa)
 		for _, value := range md {
 			o.Data = append(o.Data, value/aa)
 		}
 	}
 	return o
-}*/
+}
 
 // SelfAttention computes the self attention of Q, K, V
 func SelfAttention[T Float](Q, K, V Matrix[T]) Matrix[T] {
@@ -769,94 +870,8 @@ func (r *RNG) Intn(n int) int {
 	return p
 }*/
 
-// PageRankMarkov is a counting  pagerank implementation with a markov model
-/*func PageRankMarkov[T Float](a float32, e int, seed uint32, adj Matrix[T]) Matrix[T] {
-	for i := range adj.Rows {
-		var sum T
-		for ii := range adj.Cols {
-			value := adj.Data[i*adj.Cols+ii]
-			if value < 0 {
-				value = -value
-			}
-			sum += value
-		}
-		for ii := range adj.Cols {
-			adj.Data[i*adj.Cols+ii] /= sum
-		}
-	}
-	rng := RNG(seed)
-	counts := make([]int64, adj.Cols*adj.Rows)
-	iterations := adj.Rows * adj.Cols
-	done := make(chan bool, 8)
-	process := func(seed uint32) {
-		rng, node, prev := RNG(seed), rng.Intn(adj.Cols), 0
-		for range iterations {
-			if rng.Float32() > a {
-				prev, node = node, rng.Intn(adj.Cols)
-			}
-			total, selected, found, negative := T(0.0), T(rng.Float32()), false, false
-			for i, weight := range adj.Data[node*adj.Cols : (node+1)*adj.Cols] {
-				if weight < 0 {
-					negative = true
-					weight = -weight
-				} else {
-					negative = false
-				}
-				total += weight
-				if selected < total {
-					prev, node, found = node, i, true
-					break
-				}
-			}
-			if !found {
-				prev, node = node, rng.Intn(adj.Cols)
-			}
-			counter := &counts[node*adj.Cols+prev]
-			if negative {
-				atomic.AddInt64(counter, -1)
-			} else {
-				atomic.AddInt64(counter, 1)
-			}
-		}
-		done <- true
-	}
-
-	index, flights, cpus := 0, 0, runtime.NumCPU()
-	for index < e && flights < cpus {
-		go process(rng.Next())
-		index++
-		flights++
-	}
-	for index < e {
-		<-done
-		flights--
-
-		go process(rng.Next())
-		index++
-		flights++
-	}
-	for range flights {
-		<-done
-	}
-
-	p := NewMatrix[T](adj.Cols, adj.Rows)
-	for i := 0; i < p.Cols*p.Rows; i += p.Cols {
-		sum := int64(0)
-		for _, value := range counts[i : i+p.Cols] {
-			if value < 0 {
-				value = -value
-			}
-			sum += value
-		}
-		for _, value := range counts[i : i+p.Cols] {
-			p.Data = append(p.Data, T(value)/T(sum))
-		}
-	}
-	return p
-}*/
-
 // Transformer implements transform inference
-/*func Transformer[T Float](set Set[T], inputs, outputs Matrix[T]) Matrix[T] {
+func Transformer[T Float](set Set[T], inputs, outputs Matrix[T]) Matrix[T] {
 	itags := set.Named("itags")
 	if inputs.Rows != itags.Rows {
 		panic("rows should be the same")
@@ -893,10 +908,10 @@ func (r *RNG) Intn(n int) int {
 		Add(formOut)
 	l1Out := set.Named("l1Out").MulT(formOut1).Add(set.Named("b1Out")).ReLu().Add(formOut1)
 	return set.Named("linear").MulT(l1Out).Softmax(1)
-}*/
+}
 
 // GramSchmidt performs the Gram-Schmidt process on the columns of a matrix
-/*func (m Matrix[T]) GramSchmidt() Matrix[T] {
+func (m Matrix[T]) GramSchmidt() Matrix[T] {
 	numRows := m.Rows
 	if numRows == 0 {
 		return NewMatrix[T](0, 0)
@@ -928,7 +943,7 @@ func (r *RNG) Intn(n int) int {
 		}
 
 		// Normalize the resulting vector
-		normU := T(math.Sqrt(float64(u.MulT(u).Data[0])))
+		normU := sqrt(u.MulT(u).Data[0])
 		if normU == 0 {
 			// Handle linearly dependent vectors (e.g., set to zero vector or skip)
 			// For simplicity, we'll just set it to a zero vector here.
@@ -949,7 +964,7 @@ func (r *RNG) Intn(n int) int {
 		}
 	}
 	return n
-}*/
+}
 
 // CS is cosine similarity
 func CS[T Float](a []T, b []T) T {
@@ -957,13 +972,13 @@ func CS[T Float](a []T, b []T) T {
 }
 
 // NCS is normalized cosine similarity
-/*func NCS[T Float](a []T, b []T) T {
+func NCS[T Float](a []T, b []T) T {
 	aa, bb, ab := dot(a, a), dot(b, b), dot(a, b)
-	if aa <= 0 {
+	if aa == 0 {
 		return 0
 	}
-	if bb <= 0 {
+	if bb == 0 {
 		return 0
 	}
 	return ab / (sqrt(aa) * sqrt(bb))
-}*/
+}
