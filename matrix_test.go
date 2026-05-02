@@ -31,6 +31,19 @@ func BenchmarkExpControl(b *testing.B) {
 	}
 }
 
+func BenchmarkExpFF(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a := F32(1.0)
+		a.Exp()
+		b := F64(1.0)
+		b.Exp()
+		c := C64(1.0)
+		c.Exp()
+		d := C128(1.0)
+		d.Exp()
+	}
+}
+
 func BenchmarkExpF(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		M[F32]{V: F32(1.0)}.X()
