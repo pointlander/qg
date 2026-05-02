@@ -5,6 +5,8 @@
 package main
 
 import (
+	"math"
+	"math/cmplx"
 	"testing"
 )
 
@@ -14,6 +16,19 @@ type M[T Number] struct {
 
 func (m M[T]) X() T {
 	return m.V.Exp()
+}
+
+func BenchmarkExpControl(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a := float32(1.0)
+		math.Exp(float64(a))
+		b := 1.0
+		math.Exp(b)
+		c := complex64(1.0)
+		cmplx.Exp(complex128(c))
+		d := complex128(1.0)
+		cmplx.Exp(d)
+	}
 }
 
 func BenchmarkExpF(b *testing.B) {
