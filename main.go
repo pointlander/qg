@@ -464,6 +464,8 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) {
 	//gs := make(plotter.XYs, 0, 8)
 	gavg := make(plotter.XYs, 0, 8)
+	gavgr := make(plotter.XYs, 0, 8)
+	gavgi := make(plotter.XYs, 0, 8)
 	var gshist plotter.Values
 	for epoch := range epochs {
 		fmt.Println(epoch)
@@ -482,6 +484,8 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 		stddev = cmplx.Sqrt(stddev)
 		fmt.Println("G", avg, stddev)
 		gavg = append(gavg, plotter.XY{X: real(avg), Y: imag(avg)})
+		gavgr = append(gavgr, plotter.XY{X: float64(epoch), Y: real(avg)})
+		gavgi = append(gavgi, plotter.XY{X: float64(epoch), Y: imag(avg)})
 		for _, v := range g.X {
 			//gs = append(gs, plotter.XY{X: real(v), Y: imag(v)})
 			gshist = append(gshist, float64(cmplx.Abs(v)))
@@ -531,6 +535,48 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 	}
 
 	{
+		p := plot.New()
+
+		p.Title.Text = "real vs epoch"
+		p.X.Label.Text = "epoch"
+		p.Y.Label.Text = "real"
+
+		scatter, err := plotter.NewScatter(gavgr)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sGavgr.png", prefix))
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	{
+		p := plot.New()
+
+		p.Title.Text = "imag vs epoch"
+		p.X.Label.Text = "epoch"
+		p.Y.Label.Text = "imag"
+
+		scatter, err := plotter.NewScatter(gavgi)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sGavgi.png", prefix))
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	{
 		fmt.Println()
 		histogram := make(map[int]int)
 		for _, value := range gshist {
@@ -557,6 +603,9 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 			fmt.Println(count.Exp, ":", count.Count)
 		}
 	}
+
+	fmt.Println("real", gavgr[len(gavgr)-1].Y)
+	fmt.Println("imag", gavgi[len(gavgi)-1].Y)
 }
 
 var (
