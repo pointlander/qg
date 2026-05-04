@@ -518,12 +518,8 @@ func NewQR(rows, cols int) QR {
 	rng := rand.New(rand.NewSource(1))
 
 	set := tf64.NewSet()
-	set.Add("v", 2, rows)
-	//set.Add("v1", 2, rows)
-	set.Add("g", cols, rows)
 	set.Add("x", 2, rows)
-	//set.Add("x1", 2, rows)
-	//set.Add("xg", cols, rows)
+	set.Add("y", 2, rows)
 
 	for ii := range set.Weights {
 		w := set.Weights[ii]
@@ -554,7 +550,7 @@ func NewQR(rows, cols int) QR {
 }
 
 // Iterate iterates the g model
-func (q *QR) Iterate(iterations int) *tf64.V {
+func (q *QR) Iterate(iterations int) {
 	const Eta = 1e-1
 	drop := .3
 	dropout := map[string]interface{}{
@@ -564,10 +560,10 @@ func (q *QR) Iterate(iterations int) *tf64.V {
 
 	euclidean := tf64.B(EuclideanReal)
 
-	l0 := tf64.Mul(tf64.Dropout(tf64.Square(q.Set.Get("v")), dropout),
-		/*tf64.Hadamard(*/ tf64.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))) /*, q.Set.Get("g"))*/)
-	loss := tf64.Avg(tf64.Quadratic(tf64.Mul( /*tf64.Hadamard(*/ tf64.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), /*q.Set.Get("xg")),*/
-		tf64.Dropout(tf64.Square(q.Set.Get("v")), dropout)), l0))
+	l0 := tf64.Mul(tf64.Dropout(tf64.Square(q.Set.Get("y")), dropout),
+		tf64.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))))
+	loss := tf64.Avg(tf64.Quadratic(tf64.Mul(tf64.Dropout(tf64.Square(q.Set.Get("x")), dropout),
+		tf64.Inv(euclidean(q.Set.Get("y"), q.Set.Get("y")))), l0))
 
 	var l float64
 	for range iterations {
@@ -584,7 +580,7 @@ func (q *QR) Iterate(iterations int) *tf64.V {
 		l = tf64.Gradient(loss).X[0]
 		if math.IsNaN(l) || math.IsInf(l, 0) {
 			fmt.Println(iteration, l)
-			return nil
+			return
 		}
 
 		norm := 0.0
@@ -619,7 +615,7 @@ func (q *QR) Iterate(iterations int) *tf64.V {
 	}
 	fmt.Println(l)
 
-	v := q.Set.ByName["v"]
+	v := q.Set.ByName["x"]
 	if q.Iteration < 1024 {
 		image := image.NewPaletted(image.Rect(0, 0, 512, 512), palette)
 		type Offset struct {
@@ -662,8 +658,6 @@ func (q *QR) Iterate(iterations int) *tf64.V {
 		q.Images.Image = append(q.Images.Image, image)
 		q.Images.Delay = append(q.Images.Delay, 10)
 	}
-
-	return q.Set.ByName["g"]
 }
 
 // Simulate runs the simulation
@@ -815,104 +809,11 @@ func Simulate(prefix string, epochs int, iterate func(iterations int) *tc128.V) 
 }
 
 // Simulate runs the simulation
-func SimulateReal(prefix string, epochs int, iterate func(iterations int) *tf64.V) {
-	//gs := make(plotter.XYs, 0, 8)
-	gavg := make(plotter.XYs, 0, 8)
-	var gshist plotter.Values
+func SimulateReal(prefix string, epochs int, iterate func(iterations int)) {
 	for epoch := range epochs {
 		fmt.Println(epoch)
-		g := iterate(1)
-		avg := 0.0
-		for _, value := range g.X {
-			avg += value
-		}
-		avg /= float64(len(g.X))
-		stddev := 0.0
-		for _, value := range g.X {
-			diff := value - avg
-			stddev = diff * diff
-		}
-		stddev /= float64(len(g.X))
-		stddev = math.Sqrt(stddev)
-		fmt.Println("G", avg, stddev)
-		gavg = append(gavg, plotter.XY{X: float64(epoch), Y: avg})
-		for _, v := range g.X {
-			//gs = append(gs, plotter.XY{X: real(v), Y: imag(v)})
-			gshist = append(gshist, v)
-		}
+		iterate(1)
 	}
-
-	/*{
-		p := plot.New()
-
-		p.Title.Text = "imag vs real"
-		p.X.Label.Text = "real"
-		p.Y.Label.Text = "imag"
-
-		scatter, err := plotter.NewScatter(gs)
-		if err != nil {
-			panic(err)
-		}
-		scatter.GlyphStyle.Radius = vg.Length(1)
-		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-		p.Add(scatter)
-
-		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sG.png", prefix))
-		if err != nil {
-			panic(err)
-		}
-	}*/
-
-	{
-		p := plot.New()
-
-		p.Title.Text = "G vs epoch"
-		p.X.Label.Text = "epoch"
-		p.Y.Label.Text = "G"
-
-		scatter, err := plotter.NewScatter(gavg)
-		if err != nil {
-			panic(err)
-		}
-		scatter.GlyphStyle.Radius = vg.Length(1)
-		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-		p.Add(scatter)
-
-		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%sGavg.png", prefix))
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	{
-		fmt.Println()
-		histogram := make(map[int]int)
-		for _, value := range gshist {
-			exp := int(math.Floor(math.Log10(math.Abs(value))))
-			count := histogram[exp]
-			count++
-			histogram[exp] = count
-		}
-		type Count struct {
-			Count int
-			Exp   int
-		}
-		counts := make([]Count, 0, len(histogram))
-		for key, value := range histogram {
-			counts = append(counts, Count{
-				Count: value,
-				Exp:   key,
-			})
-		}
-		sort.Slice(counts, func(i, j int) bool {
-			return counts[i].Count < counts[j].Count
-		})
-		for _, count := range counts {
-			fmt.Println(count.Exp, ":", count.Count)
-		}
-	}
-
-	fmt.Println("real", gavg[len(gavg)-1].Y)
 }
 
 var (
