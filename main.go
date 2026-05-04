@@ -317,8 +317,10 @@ func NewQ(rows, cols int) Q {
 
 	set := tc128.NewSet()
 	set.Add("v", 2, rows)
+	set.Add("v1", 2, rows)
 	set.Add("g", cols, rows)
 	set.Add("x", 2, rows)
+	set.Add("x1", 2, rows)
 	set.Add("xg", cols, rows)
 
 	for ii := range set.Weights {
@@ -331,7 +333,7 @@ func NewQ(rows, cols int) Q {
 			}
 			continue
 		}
-		factor := math.Sqrt(2.0/float64(w.S[0])) * .1
+		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		for range cap(w.X) {
 			w.X = append(w.X, complex(rng.NormFloat64()*factor, rng.NormFloat64()*factor))
 		}
@@ -360,9 +362,9 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 	euclidean := tc128.B(Euclidean)
 
 	l0 := tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout),
-		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("v"), q.Set.Get("v"))), q.Set.Get("g")))
-	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), q.Set.Get("xg")),
-		tc128.Dropout(tc128.Square(q.Set.Get("x")), dropout)), l0))
+		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("v1"), q.Set.Get("v1"))), q.Set.Get("g")))
+	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("x")), dropout),
+		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x1"), q.Set.Get("x1"))), q.Set.Get("xg"))), l0))
 
 	var l complex128
 	for range iterations {
