@@ -519,11 +519,11 @@ func NewQR(rows, cols int) QR {
 
 	set := tf64.NewSet()
 	set.Add("v", 2, rows)
-	set.Add("v1", 2, rows)
+	//set.Add("v1", 2, rows)
 	set.Add("g", cols, rows)
 	set.Add("x", 2, rows)
-	set.Add("x1", 2, rows)
-	set.Add("xg", cols, rows)
+	//set.Add("x1", 2, rows)
+	//set.Add("xg", cols, rows)
 
 	for ii := range set.Weights {
 		w := set.Weights[ii]
@@ -555,6 +555,7 @@ func NewQR(rows, cols int) QR {
 
 // Iterate iterates the g model
 func (q *QR) Iterate(iterations int) *tf64.V {
+	const Eta = 1e-1
 	drop := .3
 	dropout := map[string]interface{}{
 		"rng":  q.Rng,
@@ -564,9 +565,9 @@ func (q *QR) Iterate(iterations int) *tf64.V {
 	euclidean := tf64.B(EuclideanReal)
 
 	l0 := tf64.Mul(tf64.Dropout(tf64.Square(q.Set.Get("v")), dropout),
-		tf64.Hadamard(tf64.Inv(euclidean(q.Set.Get("v1"), q.Set.Get("v1"))), q.Set.Get("g")))
-	loss := tf64.Avg(tf64.Quadratic(tf64.Mul(tf64.Dropout(tf64.Square(q.Set.Get("x")), dropout),
-		tf64.Hadamard(tf64.Inv(euclidean(q.Set.Get("x1"), q.Set.Get("x1"))), q.Set.Get("xg"))), l0))
+		/*tf64.Hadamard(*/ tf64.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))) /*, q.Set.Get("g"))*/)
+	loss := tf64.Avg(tf64.Quadratic(tf64.Mul( /*tf64.Hadamard(*/ tf64.Inv(euclidean(q.Set.Get("x"), q.Set.Get("x"))), /*q.Set.Get("xg")),*/
+		tf64.Dropout(tf64.Square(q.Set.Get("v")), dropout)), l0))
 
 	var l float64
 	for range iterations {
