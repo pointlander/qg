@@ -403,9 +403,9 @@ func (q *Q) Iterate(iterations int) *tc128.V {
 	euclidean := tc128.B(Euclidean)
 
 	l0 := tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("v")), dropout),
-		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("v1"), q.Set.Get("v1"))), q.Set.Get("g")))
+		tc128.Hadamard(tc128.Inv(tc128.Abs(euclidean(q.Set.Get("v1"), q.Set.Get("v1")))), q.Set.Get("g")))
 	loss := tc128.Avg(tc128.Quadratic(tc128.Mul(tc128.Dropout(tc128.Square(q.Set.Get("x")), dropout),
-		tc128.Hadamard(tc128.Inv(euclidean(q.Set.Get("x1"), q.Set.Get("x1"))), q.Set.Get("xg"))), l0))
+		tc128.Hadamard(tc128.Inv(tc128.Abs(euclidean(q.Set.Get("x1"), q.Set.Get("x1")))), q.Set.Get("xg"))), l0))
 
 	var l complex128
 	for range iterations {
