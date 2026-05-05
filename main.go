@@ -616,30 +616,24 @@ func (q *QR) Iterate(iterations int) {
 	fmt.Println(l)
 
 	v := q.Set.ByName["x"]
+	minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
+	for i := range v.S[1] {
+		x, y := v.X[i*v.S[0]], v.X[i*v.S[0]+1]
+		if x < minX {
+			minX = x
+		}
+		if x > maxX {
+			maxX = x
+		}
+		if y < minY {
+			minY = y
+		}
+		if y > maxY {
+			maxY = y
+		}
+	}
 	if q.Iteration < 1024 {
 		image := image.NewPaletted(image.Rect(0, 0, 512, 512), palette)
-		type Offset struct {
-			X int
-			Y int
-			A int
-			B int
-		}
-		minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
-		for i := range v.S[1] {
-			x, y := v.X[i*v.S[0]], v.X[i*v.S[0]+1]
-			if x < minX {
-				minX = x
-			}
-			if x > maxX {
-				maxX = x
-			}
-			if y < minY {
-				minY = y
-			}
-			if y > maxY {
-				maxY = y
-			}
-		}
 		for i := range v.S[1] {
 			xx, yy := v.X[i*v.S[0]], v.X[i*v.S[0]+1]
 			x := 500*(xx-minX)/(maxX-minX) + 6
