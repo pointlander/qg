@@ -511,6 +511,7 @@ type QR struct {
 	Set       *tf64.Set
 	Loss      plotter.XYs
 	Images    *gif.GIF
+	H         [2][2]int
 }
 
 // NewQG creates a new real model
@@ -615,10 +616,10 @@ func (q *QR) Iterate(iterations int) {
 	}
 	fmt.Println(l)
 
-	v := q.Set.ByName["x"]
+	x := q.Set.ByName["x"]
 	minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
-	for i := range v.S[1] {
-		x, y := v.X[i*v.S[0]], v.X[i*v.S[0]+1]
+	for i := range x.S[1] {
+		x, y := x.X[i*x.S[0]], x.X[i*x.S[0]+1]
 		if x < minX {
 			minX = x
 		}
@@ -632,10 +633,29 @@ func (q *QR) Iterate(iterations int) {
 			maxY = y
 		}
 	}
+	halfX, halfY := (maxX-minX)/2, (maxY-minY)/2
+	var counts [4]int
+	for i := range x.S[1] {
+		x, y := x.X[i*x.S[0]], x.X[i*x.S[0]+1]
+		if x < minX+halfX && y < minY+halfY {
+			counts[0]++
+		} else if x > minX+halfX && x < maxX && y < minY+halfY {
+			counts[1]++
+		} else if x < minX+halfX && y > minY+halfY && y < maxY {
+			counts[2]++
+		} else {
+			counts[3]++
+		}
+	}
+	if counts[0]+counts[2] < counts[1]+counts[3] {
+		q.H[0][0]++
+	} else {
+		q.H[0][1]++
+	}
 	if q.Iteration < 1024 {
 		image := image.NewPaletted(image.Rect(0, 0, 512, 512), palette)
-		for i := range v.S[1] {
-			xx, yy := v.X[i*v.S[0]], v.X[i*v.S[0]+1]
+		for i := range x.S[1] {
+			xx, yy := x.X[i*x.S[0]], x.X[i*x.S[0]+1]
 			x := 500*(xx-minX)/(maxX-minX) + 6
 			y := 500*(yy-minY)/(maxY-minY) + 6
 			image.Set(int(x), int(y), color.RGBA{0xff, 0xff, 0xff, 0xff})
@@ -651,6 +671,43 @@ func (q *QR) Iterate(iterations int) {
 		}
 		q.Images.Image = append(q.Images.Image, image)
 		q.Images.Delay = append(q.Images.Delay, 10)
+	}
+
+	y := q.Set.ByName["y"]
+	minX, maxX, minY, maxY = math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
+	for i := range y.S[1] {
+		x, y := y.X[i*y.S[0]], y.X[i*y.S[0]+1]
+		if x < minX {
+			minX = x
+		}
+		if x > maxX {
+			maxX = x
+		}
+		if y < minY {
+			minY = y
+		}
+		if y > maxY {
+			maxY = y
+		}
+	}
+	halfX, halfY = (maxX-minX)/2, (maxY-minY)/2
+	counts = [4]int{}
+	for i := range y.S[1] {
+		x, y := y.X[i*y.S[0]], y.X[i*y.S[0]+1]
+		if x < minX+halfX && y < minY+halfY {
+			counts[0]++
+		} else if x > minX+halfX && x < maxX && y < minY+halfY {
+			counts[1]++
+		} else if x < minX+halfX && y > minY+halfY && y < maxY {
+			counts[2]++
+		} else {
+			counts[3]++
+		}
+	}
+	if counts[0]+counts[2] < counts[1]+counts[3] {
+		q.H[1][0]++
+	} else {
+		q.H[1][1]++
 	}
 }
 
@@ -897,6 +954,7 @@ func main() {
 				panic(err)
 			}
 		}
+		fmt.Println(q.H)
 		return
 	}
 
