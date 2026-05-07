@@ -511,7 +511,7 @@ type QR struct {
 	Set       *tf64.Set
 	Loss      plotter.XYs
 	Images    *gif.GIF
-	H         [2][2]int
+	H         [2][4]int
 }
 
 // NewQG creates a new real model
@@ -647,10 +647,8 @@ func (q *QR) Iterate(iterations int) {
 			counts[3]++
 		}
 	}
-	if counts[0]+counts[2] < counts[1]+counts[3] {
-		q.H[0][0]++
-	} else {
-		q.H[0][1]++
+	for i, value := range counts {
+		q.H[0][i] += value
 	}
 	if q.Iteration < 1024 {
 		image := image.NewPaletted(image.Rect(0, 0, 512, 512), palette)
@@ -704,10 +702,8 @@ func (q *QR) Iterate(iterations int) {
 			counts[3]++
 		}
 	}
-	if counts[0]+counts[2] < counts[1]+counts[3] {
-		q.H[1][0]++
-	} else {
-		q.H[1][1]++
+	for i, value := range counts {
+		q.H[1][i] += value
 	}
 }
 
